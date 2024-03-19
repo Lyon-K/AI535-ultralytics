@@ -69,14 +69,15 @@ class IncpetionLayerV1(nn.Module):
         # 3x3 Conv branch
         # Channels: In = c1, mid = c3x3Red, out = c3x3
         self.branch3x3 = nn.Sequential(
-            # TODO: In Sequential blocks, remove batch norm per conv_type
-            conv_type(c1=c1, c2=c3x3Red, k=1), conv_type(c1=c3x3Red, c2=c3x3, k=3)
+            nn.Conv2d(in_channels=c1, out_channels=c3x3Red, kernel_size=1, padding=autopad(1), bias=False),
+            nn.SiLU(), conv_type(c1=c3x3Red, c2=c3x3, k=3)
         )
 
         # 5x5 Conv branch
         # Channels: In = c1, mid = c5x5Red, out = c5x5
         self.branch5x5 = nn.Sequential(
-            conv_type(c1=c1, c2=c5x5Red, k=1), conv_type(c1=c5x5Red, c2=c5x5, k=5)
+            nn.Conv2d(in_channels=c1, out_channels=c5x5Red, kernel_size=1, padding=autopad(1), bias=False),
+            nn.SiLU(), conv_type(c1=c5x5Red, c2=c5x5, k=5)
         )
 
         # Polling branch
