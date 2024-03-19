@@ -38,53 +38,25 @@ class Conv(nn.Module):
 
     default_act = nn.SiLU()  # default activation
 
-    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True, factor=False):
+    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
         """Initialize Conv layer with given arguments including activation."""
         super().__init__()
-        
-        self.convs = None
-        if factor:
-            if k < 3:
-                self.convs = nn.Sequential(nn.Conv2d(c1, c2, k, s, autopad(k, p, d), groups=g, dilation=d, bias=False))
-
-            else:
-                self.convs = []
-                counter = k
-                while counter > 3:
-                    # TODO: add activation functions between
-                    self.convs.append (nn.Conv2d(c1, c1, 3, s, autopad(3, p, d), groups=g, dilation=d, bias=False))
-                    counter = counter-2
-                
-                self.convs.append (nn.Conv2d(c1, c2, 3, s, autopad(3, p, d), groups=g, dilation=d, bias=False))
-                self.convs = nn.Sequential(*self.convs)
-
-            """
-            TODO: Figure out asymmetric convolutions
-            if k > 1:
-                self.convs = nn.Sequential(
-                    nn.Conv2d(c1, c1, (1, k), s, autopad(k, p, d), groups=g, dilation=d, bias=False),
-                    nn.Conv2d(c1, c2, (k, 1), s, autopad(k, p, d), groups=g, dilation=d, bias=False)
-                )
-            """
-
-        else:
-            self.convs = nn.Sequential(nn.Conv2d(c1, c2, k, s, autopad(k, p, d), groups=g, dilation=d, bias=False))
-
+        self.conv = nn.Conv2d(c1, c2, k, s, autopad(k, p, d), groups=g, dilation=d, bias=False)
         self.bn = nn.BatchNorm2d(c2)
         self.act = self.default_act if act is True else act if isinstance(act, nn.Module) else nn.Identity()
 
     def forward(self, x):
         """Apply convolution, batch normalization and activation to input tensor."""
-        return self.act(self.bn(self.convs(x)))
+        return self.act(self.bn(self.conv(x)))
 
     def forward_fuse(self, x):
         """Perform transposed convolution of 2D data."""
-        return self.act(self.convs(x))
+        return self.act(self.conv(x))
 
 
 class IncpetionLayerV1(nn.Module):
     def __init__(self, c1, c1x1, c3x3Red, c3x3, c5x5Red, c5x5, cPool):
-        super().__init__()
+        super().__init__()        
         conv_type = Conv
 
         # Note: Activation function orginally ReLU, SiLU here
@@ -98,19 +70,19 @@ class IncpetionLayerV1(nn.Module):
         # Channels: In = c1, mid = c3x3Red, out = c3x3
         self.branch3x3 = nn.Sequential(
             # TODO: In Sequential blocks, remove batch norm per conv_type
-            conv_type(c1=c1, c2=c3x3Red, k=1), conv_type(c1=c3x3Red, c2=c3x3, k=3, factor=True)
+            conv_type(c1=c1, c2=c3x3Red, k=1), conv_type(c1=c3x3Red, c2=c3x3, k=3)
         )
 
         # 5x5 Conv branch
         # Channels: In = c1, mid = c5x5Red, out = c5x5
         self.branch5x5 = nn.Sequential(
-            conv_type(c1=c1, c2=c5x5Red, k=1), conv_type(c1=c5x5Red, c2=c5x5, k=5, factor=True)
+            conv_type(c1=c1, c2=c5x5Red, k=1), conv_type(c1=c5x5Red, c2=c5x5, k=5)
         )
 
         # Polling branch
         # Channels: In = c1, out = cPool
         self.branchPool = nn.Sequential(
-            nn.MaxPool2d(kernel_size=3, stride=2, padding=autopad(3)),
+            nn.MaxPool2d(kernel_size=3, stride=1, padding=autopad(3)),
             conv_type(c1=c1, c2=cPool, k=1)
         )
     

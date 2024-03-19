@@ -48,6 +48,7 @@ from ultralytics.nn.modules import (
     SPPELAN,
     CBFuse,
     CBLinear,
+    IncpetionLayerV1,
     Silence,
 )
 from ultralytics.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, colorstr, emojis, yaml_load
@@ -867,8 +868,10 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             DWConvTranspose2d,
             C3x,
             RepC3,
+            IncpetionLayerV1,
         ):
             c1, c2 = ch[f], args[0]
+            temp_args = args
             if c2 != nc:  # if c2 not equal to number of classes (i.e. for Classify() output)
                 c2 = make_divisible(min(c2, max_channels) * width, 8)
             if m is C2fAttn:
@@ -876,11 +879,15 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
                 args[2] = int(
                     max(round(min(args[2], max_channels // 2 // 32)) * width, 1) if args[2] > 1 else args[2]
                 )  # num heads
-
             args = [c1, c2, *args[1:]]
             if m in (BottleneckCSP, C1, C2, C2f, C2fAttn, C3, C3TR, C3Ghost, C3x, RepC3):
                 args.insert(2, n)  # number of repeats
                 n = 1
+            if m is IncpetionLayerV1:
+                c2 = temp_args[0] + temp_args[2] + temp_args[4] + temp_args[5]
+                args = [c1, *temp_args]
+
+
         elif m is AIFI:
             args = [ch[f], *args]
         elif m in (HGStem, HGBlock):
