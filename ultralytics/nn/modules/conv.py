@@ -58,9 +58,7 @@ class IncpetionLayerV1(nn.Module):
     def __init__(self, c1, c1x1, c3x3Red, c3x3, c5x5Red, c5x5, cPool):
         super().__init__()        
         conv_type = Conv
-
-        # Note: Activation function orginally ReLU, SiLU here
-        # TODO: Tune feature sizes (backbone) or Polling layer type
+        self.final_pool = nn.MaxPool2d(kernel_size=3, stride=2, padding=autopad(3))
 
         # 1x1 layer
         # Channels: In = c1, out = c1x1
@@ -97,7 +95,9 @@ class IncpetionLayerV1(nn.Module):
 
     def forward(self, x):
         branches = self.branch_forward(x)
-        return torch.cat(branches, 1)
+        branches_cat = torch.cat(branches, 1)
+        branches_red = self.final_pool(branches_cat)
+        return branches_red
 
 
 
