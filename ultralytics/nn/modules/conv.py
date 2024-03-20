@@ -204,8 +204,8 @@ class IncpetionLayerV3Down(nn.Module):
 
         super().__init__()        
         conv_type = Conv
-        final_filter = int(c1 / 2)
-        print (final_filter)
+        c3x3out = int (c1 * (3/4))
+        c5x5out = int (c1 / 4)
 
         # Polling branch
         # Channels: In = c1, out = cPool
@@ -217,15 +217,15 @@ class IncpetionLayerV3Down(nn.Module):
         # Channels: In = c1, mid = c3x3Red, out = c3x3
         self.branch3x3 = nn.Sequential(
             conv_type(c1=c1, c2=c3x3Red, k=1), 
-            conv_type(c1=c3x3Red, c2=final_filter, k=3, s=2)
+            conv_type(c1=c3x3Red, c2=c3x3out, k=3, s=2)
         )
 
         # 5x5 Conv branch
         # Channels: In = c1, mid = c5x5Red, out = c5x5
         self.branch5x5stack = nn.Sequential(
             conv_type(c1=c1, c2=c5x5Red, k=1), 
-            conv_type(c1=c5x5Red, c2=final_filter, k=3),
-            conv_type(c1=final_filter, c2=final_filter, k=3, s=2),
+            conv_type(c1=c5x5Red, c2=c5x5out, k=3),
+            conv_type(c1=c5x5out, c2=c5x5out, k=3, s=2),
         )
     
     def branch_forward(self, x):
