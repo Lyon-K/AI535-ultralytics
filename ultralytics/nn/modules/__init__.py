@@ -62,6 +62,9 @@ from .conv import (
     RepConv,
     SpatialAttention,
     IncpetionLayerV1,
+    IncpetionLayerV3Factor,
+    IncpetionLayerV3Asymmetric,
+    IncpetionLayerV3Down,
 )
 from .head import OBB, Classify, Detect, Pose, RTDETRDecoder, Segment, WorldDetect
 from .transformer import (
@@ -137,4 +140,7 @@ __all__ = (
     "CBLinear",
     "Silence",
     "IncpetionLayerV1",
+    "IncpetionLayerV3Factor",
+    "IncpetionLayerV3Asymmetric",
+    "IncpetionLayerV3Down",
 )

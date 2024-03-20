@@ -49,6 +49,9 @@ from ultralytics.nn.modules import (
     CBFuse,
     CBLinear,
     IncpetionLayerV1,
+    IncpetionLayerV3Factor,
+    IncpetionLayerV3Asymmetric,
+    IncpetionLayerV3Down,
     Silence,
 )
 from ultralytics.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, colorstr, emojis, yaml_load
@@ -914,6 +917,14 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             args = [c1, c2, *args[1:]]
         elif m is CBFuse:
             c2 = ch[f[-1]]
+        elif m in (IncpetionLayerV3Factor, IncpetionLayerV3Asymmetric):
+            c1 = ch[f]
+            c2 = args[0] + args[2] + args[4] + args[5]
+            args = [c1, *args]
+        elif m is IncpetionLayerV3Down:
+            c1 = ch[f]
+            c2 = 2*c1
+            args = [c1, *args]
         else:
             c2 = ch[f]
 

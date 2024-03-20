@@ -60,22 +60,22 @@ class IncpetionLayerV1(nn.Module):
         conv_type = Conv
         self.final_pool = nn.MaxPool2d(kernel_size=3, stride=2, padding=autopad(3))
 
-        # 1x1 layer
+        # 1x1 Conv branch
         # Channels: In = c1, out = c1x1
         self.branch1x1 = conv_type(c1=c1, c2=c1x1, k=1)
 
         # 3x3 Conv branch
         # Channels: In = c1, mid = c3x3Red, out = c3x3
         self.branch3x3 = nn.Sequential(
-            nn.Conv2d(in_channels=c1, out_channels=c3x3Red, kernel_size=1, padding=autopad(1), bias=False),
-            nn.SiLU(), conv_type(c1=c3x3Red, c2=c3x3, k=3)
+            conv_type(c1=c1, c2=c3x3Red, k=1),
+            conv_type(c1=c3x3Red, c2=c3x3, k=3)
         )
 
         # 5x5 Conv branch
         # Channels: In = c1, mid = c5x5Red, out = c5x5
         self.branch5x5 = nn.Sequential(
-            nn.Conv2d(in_channels=c1, out_channels=c5x5Red, kernel_size=1, padding=autopad(1), bias=False),
-            nn.SiLU(), conv_type(c1=c5x5Red, c2=c5x5, k=5)
+            conv_type(c1=c1, c2=c5x5Red, k=1),
+            conv_type(c1=c5x5Red, c2=c5x5, k=5)
         )
 
         # Polling branch
@@ -100,6 +100,146 @@ class IncpetionLayerV1(nn.Module):
         return branches_red
 
 
+class IncpetionLayerV3Factor(nn.Module):
+    def __init__(self, c1, c1x1, c3x3Red, c3x3, c5x5Red, c5x5, cPool):
+
+        super().__init__()        
+        conv_type = Conv
+        self.final_pool = nn.MaxPool2d(kernel_size=3, stride=2, padding=autopad(3))
+
+        # 1x1 layer
+        # Channels: In = c1, out = c1x1
+        self.branch1x1 = conv_type(c1=c1, c2=c1x1, k=1)
+
+        # Polling branch
+        # Channels: In = c1, out = cPool
+        self.branchPool = nn.Sequential(
+            nn.MaxPool2d(kernel_size=3, stride=1, padding=autopad(3)),
+            conv_type(c1=c1, c2=cPool, k=1)
+        )
+
+        # 3x3 Conv branch
+        # Channels: In = c1, mid = c3x3Red, out = c3x3
+        self.branch3x3 = nn.Sequential(
+            conv_type(c1=c1, c2=c3x3Red, k=1), 
+            conv_type(c1=c3x3Red, c2=c3x3, k=3)
+        )
+
+        # 5x5 Conv branch
+        # Channels: In = c1, mid = c5x5Red, out = c5x5
+        self.branch5x5stack = nn.Sequential(
+            conv_type(c1=c1, c2=c5x5Red, k=1), 
+            conv_type(c1=c5x5Red, c2=c5x5, k=3),
+            conv_type(c1=c5x5, c2=c5x5, k=3),
+        )
+    
+    def branch_forward(self, x):
+        branch1x1  = self.branch1x1(x)
+        branch3x3  = self.branch3x3(x)
+        branch5x5  = self.branch5x5stack(x)
+        branchPool = self.branchPool(x)
+
+        return [branch1x1, branch3x3, branch5x5, branchPool]
+
+    def forward(self, x):
+        branches = self.branch_forward(x)
+        branches_cat = torch.cat(branches, 1)
+        branches_red = self.final_pool(branches_cat)
+        return branches_red
+
+
+class IncpetionLayerV3Asymmetric(nn.Module):
+    def __init__(self, c1, c1x1, c3x3Red, c3x3, c5x5Red, c5x5, cPool):
+
+        super().__init__()        
+        conv_type = Conv
+        self.final_pool = nn.MaxPool2d(kernel_size=3, stride=2, padding=autopad(3))
+
+        # 1x1 layer
+        # Channels: In = c1, out = c1x1
+        self.branch1x1 = conv_type(c1=c1, c2=c1x1, k=1)
+
+        # Polling branch
+        # Channels: In = c1, out = cPool
+        self.branchPool = nn.Sequential(
+            nn.MaxPool2d(kernel_size=3, stride=1, padding=autopad(3)),
+            conv_type(c1=c1, c2=cPool, k=1)
+        )
+
+        # 7x7 Conv branch
+        # Channels: In = c1, mid = c3x3Red, out = c3x3
+        self.branch7x7 = nn.Sequential(
+            conv_type(c1=c1, c2=c3x3Red, k=1),
+            conv_type(c1=c3x3Red, c2=c3x3, k=(7, 1), p=(3, 0)),
+            conv_type(c1=c3x3, c2=c3x3, k=(1, 7), p=(0, 3))
+        )
+
+        # 5x5 Conv branch
+        # Channels: In = c1, mid = c5x5Red, out = c5x5
+        self.branch7x7stack = nn.Sequential(
+            conv_type(c1=c1, c2=c5x5Red, k=1), 
+            conv_type(c1=c5x5Red, c2=c5x5, k=(7, 1), p=(3, 0)),
+            conv_type(c1=c5x5, c2=c5x5, k=(1, 7), p=(0, 3)),
+            conv_type(c1=c5x5, c2=c5x5, k=(7, 1), p=(3, 0)),
+            conv_type(c1=c5x5, c2=c5x5, k=(1, 7), p=(0, 3))
+        )
+    
+    def branch_forward(self, x):
+        branch1x1      = self.branch1x1(x)
+        branch7x7      = self.branch7x7(x)
+        branch7x7stack = self.branch7x7stack(x)
+        branchPool     = self.branchPool(x)
+
+        return [branch1x1, branch7x7, branch7x7stack, branchPool]
+
+    def forward(self, x):
+        branches = self.branch_forward(x)
+        branches_cat = torch.cat(branches, 1)
+        branches_red = self.final_pool(branches_cat)
+        return branches_red
+
+
+class IncpetionLayerV3Down(nn.Module):
+    def __init__(self, c1, c3x3Red, c5x5Red):
+
+        super().__init__()        
+        conv_type = Conv
+        final_filter = int(c1 / 2)
+        print (final_filter)
+
+        # Polling branch
+        # Channels: In = c1, out = cPool
+        self.branchPool = nn.Sequential(
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=autopad(3)),
+        )
+
+        # 3x3 Conv branch
+        # Channels: In = c1, mid = c3x3Red, out = c3x3
+        self.branch3x3 = nn.Sequential(
+            conv_type(c1=c1, c2=c3x3Red, k=1), 
+            conv_type(c1=c3x3Red, c2=final_filter, k=3, s=2)
+        )
+
+        # 5x5 Conv branch
+        # Channels: In = c1, mid = c5x5Red, out = c5x5
+        self.branch5x5stack = nn.Sequential(
+            conv_type(c1=c1, c2=c5x5Red, k=1), 
+            conv_type(c1=c5x5Red, c2=final_filter, k=3),
+            conv_type(c1=final_filter, c2=final_filter, k=3, s=2),
+        )
+    
+    def branch_forward(self, x):
+        branch3x3  = self.branch3x3(x)
+        branch5x5  = self.branch5x5stack(x)
+        branchPool = self.branchPool(x)
+
+        return [branch3x3, branch5x5, branchPool]
+
+    def forward(self, x):
+        branches = self.branch_forward(x)
+        branches_cat = torch.cat(branches, 1)
+        return branches_cat
+        
 
 class Conv2(Conv):
     """Simplified RepConv module with Conv fusing."""
